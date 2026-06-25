@@ -1,15 +1,13 @@
 import asyncio
 
-# പൈത്തൺ ആദ്യം തന്നെ ഈ മാജിക് ലൂപ്പ് സെറ്റ് ചെയ്യണം (ഇത് മുകളിൽ തന്നെ വേണം)
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 
-import re
 import os
 from pyrogram import Client, filters
 from aiohttp import web
 
-# റെണ്ടറിൽ നിന്നുള്ള ഡാറ്റ
+# Render-ൽ നിന്ന് ഡാറ്റ എടുക്കുന്നു
 API_ID = int(os.environ.get("API_ID", 0))
 API_HASH = os.environ.get("API_HASH", "")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
@@ -20,13 +18,13 @@ bot = Client("trenda_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN
 
 @bot.on_message(filters.command("start"))
 async def start(client, message):
-    await message.reply_text("Hello! I am ready. Send me a movie! 🍿")
+    await message.reply_text("Hello! Trenda Bot is ready. Send me a movie! 🍿")
 
 @bot.on_message(filters.video | filters.document)
 async def handle_media(client, message):
-    # പുതിയ ലിങ്ക് ഫോർമാറ്റ് (Skip ചെയ്യാൻ സൈസ് അറിയേണ്ടതുണ്ട്)
+    # Chat ID-യും Message ID-യും ഉപയോഗിച്ച് ലിങ്ക് ഉണ്ടാക്കുന്നു (Seek support-ന് ഇത് വേണം)
     link = f"{URL}/stream/{message.chat.id}/{message.id}"
-    await message.reply_text(f"✅ Your Direct Stream Link:\n\n`{link}`\n\nPaste this in your admin panel!")
+    await message.reply_text(f"✅ Your Direct Stream Link:\n\n`{link}`\n\nCopy this and paste it into your admin panel. 👍")
 
 routes = web.RouteTableDef()
 
@@ -34,61 +32,25 @@ routes = web.RouteTableDef()
 async def index(request):
     return web.Response(text="Trenda Streaming Server is Live!")
 
-# വീഡിയോ സ്കിപ്പ് ചെയ്യാൻ സപ്പോർട്ട് നൽകുന്ന പുതിയ സ്ട്രീമിംഗ് ഭാഗം
+# വീഡിയോ സ്ട്രീമിംഗ് രീതി: ടെലിഗ്രാം ഡയറക്റ്റ് ലിങ്കിലേക്ക് റീഡയറക്റ്റ് ചെയ്യുന്നു
 @routes.get("/stream/{chat_id}/{msg_id}")
 async def stream(request):
     try:
         chat_id = int(request.match_info['chat_id'])
         msg_id = int(request.match_info['msg_id'])
         
-        # സിനിമയുടെ സൈസ് കണ്ടുപിടിക്കാൻ
         msg = await bot.get_messages(chat_id, msg_id)
         file = msg.video or msg.document
-        file_size = file.file_size
         
-        # യൂസർ ഏത് മിനിറ്റിലേക്കാണോ മാറ്റിയത് ആ ഭാഗം എടുക്കാൻ (Range Header)
-        range_header = request.headers.get('Range', '')
+        # ടെലിഗ്രാമിന്റെ നേരിട്ടുള്ള ഫയൽ ലിങ്ക് എടുക്കുന്നു
+        file_url = await bot.get_file_link(file)
         
-        if range_header:
-            match = re.match(r'bytes=(\d+)-(\d*)', range_header)
-            if match:
-                start = int(match.group(1))
-                end = int(match.group(2)) if match.group(2) else file_size - 1
-            else:
-                start = 0
-                end = file_size - 1
-            
-            length = end - start + 1
-            
-            headers = {
-                'Content-Range': f'bytes {start}-{end}/{file_size}',
-                'Accept-Ranges': 'bytes',
-                'Content-Length': str(length),
-                'Content-Type': 'video/mp4'
-            }
-            
-            response = web.StreamResponse(status=206, headers=headers)
-            await response.prepare(request)
-            
-            # വീഡിയോയുടെ ആവശ്യപ്പെടുന്ന ഭാഗത്ത് നിന്ന് മാത്രം സ്ട്രീം ചെയ്യുക
-            async for chunk in bot.stream_media(msg, offset=start, limit=length):
-                await response.write(chunk)
-            return response
-        else:
-            headers = {
-                'Accept-Ranges': 'bytes',
-                'Content-Length': str(file_size),
-                'Content-Type': 'video/mp4'
-            }
-            response = web.StreamResponse(status=200, headers=headers)
-            await response.prepare(request)
-            async for chunk in bot.stream_media(msg):
-                await response.write(chunk)
-            return response
+        # പ്ലെയറിലേക്ക് നേരിട്ട് ലിങ്ക് അയക്കുന്നു (ഇത് വളരെ ഫാസ്റ്റ് ആണ്)
+        raise web.HTTPFound(location=file_url)
             
     except Exception as e:
         print(f"Error: {e}")
-        return web.Response(status=500, text="Internal Server Error")
+        return web.Response(status=500, text="Streaming Error!")
 
 app = web.Application()
 app.add_routes(routes)
@@ -99,7 +61,7 @@ async def main():
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
-    print("Bot is Live and Streaming Data with Seek Support!")
+    print("Bot is Live and Streaming Data!")
     await asyncio.Event().wait()
 
 if __name__ == "__main__":
