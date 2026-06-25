@@ -1,5 +1,10 @@
-import os
 import asyncio
+
+# ഈ രണ്ട് വരികളാണ് ആ എറർ മാറ്റാനുള്ള മാജിക്!
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+
+import os
 from pyrogram import Client, filters
 from aiohttp import web
 
@@ -48,4 +53,4 @@ async def main():
     await asyncio.Event().wait()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    loop.run_until_complete(main())
