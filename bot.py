@@ -1,11 +1,13 @@
 import asyncio
+
+# ഈ രണ്ട് വരികൾ Pyrogram Import ചെയ്യുന്നതിന് മുൻപ് തന്നെ വരണം (ഇതായിരുന്നു പ്രശ്നം)
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+
 import os
 import re
 from pyrogram import Client, filters
 from aiohttp import web
-
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
 
 # റെണ്ടറിൽ നിന്നുള്ള ഡാറ്റ
 API_ID = int(os.environ.get("API_ID", 0))
@@ -42,7 +44,6 @@ async def stream(request):
         file = msg.video or msg.document
         file_size = file.file_size
         
-        # പ്ലെയറിൽ നിന്ന് വീഡിയോ മാറ്റുന്നതിന് (Seeking) വേണ്ടിയുള്ള ഭാഗം
         range_header = request.headers.get('Range', '')
         
         if range_header:
