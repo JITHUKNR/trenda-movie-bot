@@ -11,7 +11,7 @@ json_key = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
 cred_dict = json.loads(json_key)
 cred = credentials.Certificate(cred_dict)
 firebase_admin.initialize_app(cred, {
-    'databaseURL': 'https://trenda-store-default-rtdb.firebaseio.com/'
+    'databaseURL': 'https://trenda-store-default-rtdb.asia-southeast1.firebasedatabase.app/'
 })
 ref = db.reference('products')
 
