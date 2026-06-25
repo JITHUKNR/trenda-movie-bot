@@ -18,19 +18,12 @@ bot = Client("trenda_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN
 
 @bot.on_message(filters.command("start"))
 async def start(client, message):
-    await message.reply_text("Hello! I am ready. Send me a movie! 🍿")
+    await message.reply_text("Hello! Trenda Bot is ready. Send me a movie! 🍿")
 
 @bot.on_message(filters.video | filters.document)
 async def handle_media(client, message):
-    # വീഡിയോയുടെ യഥാർത്ഥ File ID എടുക്കുന്നു
-    if message.video:
-        file_id = message.video.file_id
-    elif message.document:
-        file_id = message.document.file_id
-    else:
-        return
-
-    link = f"{URL}/stream/{file_id}"
+    # പുതിയ ലിങ്ക് ഫോർമാറ്റ് (Skip ചെയ്യാനും വെബ്സൈറ്റിൽ വർക്ക് ചെയ്യാനും ഇത് നിർബന്ധമാണ്)
+    link = f"{URL}/stream/{message.chat.id}/{message.id}"
     await message.reply_text(f"✅ Your Direct Stream Link:\n\n`{link}`\n\nPaste this in your admin panel!")
 
 routes = web.RouteTableDef()
@@ -39,28 +32,23 @@ routes = web.RouteTableDef()
 async def index(request):
     return web.Response(text="Trenda Streaming Server is Live!")
 
-# വീഡിയോ വെബ്സൈറ്റിലേക്ക് പ്ലേ ചെയ്യിപ്പിക്കുന്ന പ്രധാന ഭാഗം
-@routes.get("/stream/{file_id}")
+# വീഡിയോ വെബ്സൈറ്റിലേക്ക് നേരിട്ട് പ്ലേ ചെയ്യിപ്പിക്കുന്ന പുതിയ രീതി
+@routes.get("/stream/{chat_id}/{msg_id}")
 async def stream(request):
-    file_id = request.match_info['file_id']
-    
-    # വീഡിയോ പ്ലെയറിന് മനസ്സിലാകാൻ വേണ്ടിയുള്ള ഹെഡറുകൾ
-    headers = {
-        'Content-Type': 'video/mp4',
-        'Accept-Ranges': 'bytes'
-    }
-    
-    response = web.StreamResponse(headers=headers)
-    await response.prepare(request)
-    
     try:
-        # ടെലിഗ്രാമിൽ നിന്ന് ലൈവ് ആയി ഡാറ്റ എടുത്ത് വെബ്സൈറ്റിലേക്ക് കൊടുക്കുന്നു
-        async for chunk in bot.stream_media(file_id):
-            await response.write(chunk)
+        chat_id = int(request.match_info['chat_id'])
+        msg_id = int(request.match_info['msg_id'])
+        
+        msg = await bot.get_messages(chat_id, msg_id)
+        file = msg.video or msg.document
+        
+        # ടെലിഗ്രാമിൽ നിന്ന് ലൈവ് ആയി ഡയറക്റ്റ് ലിങ്ക് എടുക്കുന്നു
+        file_url = await bot.get_file_link(file)
+        raise web.HTTPFound(location=file_url)
+            
     except Exception as e:
         print(f"Error: {e}")
-        
-    return response
+        return web.Response(status=500, text="Streaming Error!")
 
 app = web.Application()
 app.add_routes(routes)
