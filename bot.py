@@ -1,11 +1,11 @@
 import asyncio
+import os
+import re
+from pyrogram import Client, filters
+from aiohttp import web
 
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
-
-import os
-from pyrogram import Client, filters
-from aiohttp import web
 
 # റെണ്ടറിൽ നിന്നുള്ള ഡാറ്റ
 API_ID = int(os.environ.get("API_ID", 0))
@@ -22,7 +22,6 @@ async def start(client, message):
 
 @bot.on_message(filters.video | filters.document)
 async def handle_media(client, message):
-    # പുതിയ ലിങ്ക് ഫോർമാറ്റ് (Skip ചെയ്യാനും വെബ്സൈറ്റിൽ വർക്ക് ചെയ്യാനും ഇത് നിർബന്ധമാണ്)
     link = f"{URL}/stream/{message.chat.id}/{message.id}"
     await message.reply_text(f"✅ Your Direct Stream Link:\n\n`{link}`\n\nPaste this in your admin panel!")
 
@@ -32,7 +31,7 @@ routes = web.RouteTableDef()
 async def index(request):
     return web.Response(text="Trenda Streaming Server is Live!")
 
-# വീഡിയോ വെബ്സൈറ്റിലേക്ക് നേരിട്ട് പ്ലേ ചെയ്യിപ്പിക്കുന്ന പുതിയ രീതി
+# പ്ലെയറിലേക്ക് നേരിട്ട് വീഡിയോ സ്ട്രീം ചെയ്യുന്ന ഭാഗം (Skip Support ഉൾപ്പെടെ)
 @routes.get("/stream/{chat_id}/{msg_id}")
 async def stream(request):
     try:
@@ -41,10 +40,40 @@ async def stream(request):
         
         msg = await bot.get_messages(chat_id, msg_id)
         file = msg.video or msg.document
+        file_size = file.file_size
         
-        # ടെലിഗ്രാമിൽ നിന്ന് ലൈവ് ആയി ഡയറക്റ്റ് ലിങ്ക് എടുക്കുന്നു
-        file_url = await bot.get_file_link(file)
-        raise web.HTTPFound(location=file_url)
+        # പ്ലെയറിൽ നിന്ന് വീഡിയോ മാറ്റുന്നതിന് (Seeking) വേണ്ടിയുള്ള ഭാഗം
+        range_header = request.headers.get('Range', '')
+        
+        if range_header:
+            match = re.match(r'bytes=(\d+)-(\d*)', range_header)
+            start = int(match.group(1)) if match else 0
+            end = int(match.group(2)) if match and match.group(2) else file_size - 1
+            length = end - start + 1
+            
+            headers = {
+                'Content-Range': f'bytes {start}-{end}/{file_size}',
+                'Accept-Ranges': 'bytes',
+                'Content-Length': str(length),
+                'Content-Type': 'video/mp4'
+            }
+            response = web.StreamResponse(status=206, headers=headers)
+            await response.prepare(request)
+            
+            async for chunk in bot.stream_media(msg, offset=start, limit=length):
+                await response.write(chunk)
+            return response
+        else:
+            headers = {
+                'Accept-Ranges': 'bytes',
+                'Content-Length': str(file_size),
+                'Content-Type': 'video/mp4'
+            }
+            response = web.StreamResponse(status=200, headers=headers)
+            await response.prepare(request)
+            async for chunk in bot.stream_media(msg):
+                await response.write(chunk)
+            return response
             
     except Exception as e:
         print(f"Error: {e}")
