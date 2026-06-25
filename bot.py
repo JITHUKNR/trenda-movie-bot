@@ -15,7 +15,7 @@ firebase_admin.initialize_app(cred, {
 })
 ref = db.reference('products')
 
-# 2. റെണ്ടറിനെ പറ്റിക്കാൻ ഒരു വെബ് സർവർ (ഇത് പോർട്ട് പ്രശ്നം തീർക്കും)
+# 2. വെബ് സർവർ (റെണ്ടർ പോർട്ട് പ്രശ്നം തീർക്കാൻ)
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -32,4 +32,19 @@ async def handle_video(update, context):
     video = update.message.video
     movie_data = {
         "name": update.message.caption or "New Movie",
-        "embedUrl": f"https://t.me/c/{update.message.
+        "embedUrl": f"https://t.me/c/{update.message.chat.id}/{video.file_id}",
+        "image": "https://via.placeholder.com/150"
+    }
+    ref.push(movie_data)
+    await update.message.reply_text("സക്സസ്! നിന്റെ സിനിമ സൈറ്റിൽ അപ്‌ഡേറ്റ് ആയി. ✅")
+
+# 4. മെയിൻ റണ്ണിംഗ് ഫങ്ഷൻ
+if __name__ == '__main__':
+    threading.Thread(target=run_server, daemon=True).start()
+    
+    bot_token = os.environ.get("BOT_TOKEN")
+    app = ApplicationBuilder().token(bot_token).build()
+    app.add_handler(MessageHandler(filters.VIDEO, handle_video))
+    
+    print("ബോട്ട് ലൈവ് ആണ്!")
+    app.run_polling()
