@@ -47,4 +47,4 @@ if __name__ == '__main__':
     app.add_handler(MessageHandler(filters.VIDEO, handle_video))
     
     print("ബോട്ട് ലൈവ് ആണ്!")
-    app.run_polling()
+    app.run_polling(drop_pending_updates=True)
