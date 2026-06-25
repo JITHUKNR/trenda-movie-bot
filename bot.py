@@ -1,11 +1,13 @@
 import asyncio
+
+# പൈത്തൺ ആദ്യം തന്നെ ഈ മാജിക് ലൂപ്പ് സെറ്റ് ചെയ്യണം (ഇത് മുകളിൽ തന്നെ വേണം)
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+
 import re
 import os
 from pyrogram import Client, filters
 from aiohttp import web
-
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
 
 # റെണ്ടറിൽ നിന്നുള്ള ഡാറ്റ
 API_ID = int(os.environ.get("API_ID", 0))
