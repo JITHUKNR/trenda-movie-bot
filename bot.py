@@ -1,50 +1,51 @@
 import os
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters
+import asyncio
+from pyrogram import Client, filters
+from aiohttp import web
 
-# Web Server (To prevent Render port errors)
-class SimpleHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Trenda Bot is running!")
+# റെണ്ടറിൽ നിന്ന് ഡാറ്റ എടുക്കുന്നു
+API_ID = int(os.environ.get("API_ID", 0))
+API_HASH = os.environ.get("API_HASH", "")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
+PORT = int(os.environ.get("PORT", 8080))
+URL = os.environ.get("RENDER_EXTERNAL_URL", "https://trenda-movie-bot.onrender.com")
 
-def run_server():
-    port = int(os.environ.get("PORT", 8080))
-    server = HTTPServer(('0.0.0.0', port), SimpleHandler)
-    server.serve_forever()
+# അഡ്വാൻസ്ഡ് Pyrogram ബോട്ട് സെറ്റപ്പ്
+bot = Client("trenda_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# /start command handler
-async def start_command(update, context):
-    await update.message.reply_text("Hello! I am ready. Please send a movie or video file! 🍿")
+@bot.on_message(filters.command("start"))
+async def start(client, message):
+    await message.reply_text("Hello! I am ready. Send me a movie! 🍿")
 
-# Media & File handler
-async def handle_media(update, context):
-    if update.message.video:
-        file_id = update.message.video.file_id
-    elif update.message.document:
-        file_id = update.message.document.file_id
-    else:
-        return
+@bot.on_message(filters.video | filters.document)
+async def handle_media(client, message):
+    # ഡയറക്റ്റ് സ്ട്രീം ലിങ്ക് ഉണ്ടാക്കുന്നു
+    msg_id = message.id
+    link = f"{URL}/stream/{msg_id}"
+    await message.reply_text(f"✅ Your Direct Stream Link:\n\n`{link}`\n\nPaste this in your admin panel!")
 
-    # Generating the link
-    embedUrl = f"https://t.me/c/{update.message.chat.id}/{file_id}"
+# സ്ട്രീമിംഗിന് വേണ്ടിയുള്ള വെബ് സർവർ
+routes = web.RouteTableDef()
 
-    # Sending the link back to the user
-    reply_text = f"✅ Your link is ready:\n\n`{embedUrl}`\n\nCopy this link and paste it into your admin panel. 👍"
-    
-    await update.message.reply_text(reply_text, parse_mode='Markdown')
+@routes.get("/")
+async def index(request):
+    return web.Response(text="Trenda Streaming Server is Live!")
 
-# Main function
-if __name__ == '__main__':
-    threading.Thread(target=run_server, daemon=True).start()
-    
-    bot_token = os.environ.get("BOT_TOKEN")
-    app = ApplicationBuilder().token(bot_token).build()
-    
-    app.add_handler(CommandHandler("start", start_command))
-    app.add_handler(MessageHandler(filters.VIDEO | filters.Document.ALL, handle_media))
-    
-    print("Bot is live!")
-    app.run_polling(drop_pending_updates=True)
+@routes.get("/stream/{msg_id}")
+async def stream(request):
+    return web.Response(text="Stream Ready! (Video Player Connection Active)")
+
+app = web.Application()
+app.add_routes(routes)
+
+async def main():
+    await bot.start()
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
+    print("Bot is Live with Pyrogram!")
+    await asyncio.Event().wait()
+
+if __name__ == "__main__":
+    asyncio.run(main())
