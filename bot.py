@@ -15,7 +15,7 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 PORT = int(os.environ.get("PORT", 8080))
 URL = os.environ.get("RENDER_EXTERNAL_URL", "https://trenda-movie-bot.onrender.com")
 
-# നിന്റെ ചാനലിന്റെ ഐഡി (ഇതിലേക്കാണ് വീഡിയോകൾ സുരക്ഷിതമായി സേവ് ആകുന്നത്)
+# നിന്റെ ചാനലിന്റെ ഐഡി 
 CHANNEL_USERNAME = os.environ.get("CHANNEL_USERNAME", "-1004402285436")
 
 bot = Client("trenda_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
@@ -29,15 +29,12 @@ async def handle_media(client, message):
     try:
         m = await message.reply_text("⏳ Processing your video securely... Please wait.")
         
-        # 1. നീ അയക്കുന്ന വീഡിയോ ബോട്ട് ആദ്യം നിന്റെ ചാനലിലേക്ക് കോപ്പി ചെയ്യുന്നു
         if str(CHANNEL_USERNAME).lstrip('-').isdigit():
             target_chat = int(CHANNEL_USERNAME)
         else:
             target_chat = CHANNEL_USERNAME
             
         copied_msg = await message.copy(chat_id=target_chat)
-        
-        # 2. ചാനലിലെ ആ വീഡിയോയുടെ ഐഡി വെച്ച് പുതിയ കിടിലൻ ലിങ്ക് ഉണ്ടാക്കുന്നു
         link = f"{URL}/stream/{target_chat}/{copied_msg.id}"
         
         await m.edit_text(f"✅ **Your Permanent Direct Stream Link:**\n\n`{link}`\n\nPaste this in your admin panel!")
@@ -86,6 +83,9 @@ async def stream(request):
         
         range_header = request.headers.get('Range', '')
         
+        # ബ്രൗസറിനെ നിർബന്ധിച്ച് MP4 പ്ലേ ചെയ്യിപ്പിക്കാനുള്ള സൂപ്പർ ഫിക്സ് 👇
+        forced_filename = "trenda_movie.mp4"
+        
         if range_header:
             match = re.match(r'bytes=(\d+)-(\d*)', range_header)
             start = int(match.group(1)) if match else 0
@@ -97,6 +97,7 @@ async def stream(request):
                 'Accept-Ranges': 'bytes',
                 'Content-Length': str(length),
                 'Content-Type': 'video/mp4',
+                'Content-Disposition': f'inline; filename="{forced_filename}"',
                 'Access-Control-Allow-Origin': '*'
             }
             response = web.StreamResponse(status=206, headers=headers)
@@ -115,6 +116,7 @@ async def stream(request):
                 'Accept-Ranges': 'bytes',
                 'Content-Length': str(file_size),
                 'Content-Type': 'video/mp4',
+                'Content-Disposition': f'inline; filename="{forced_filename}"',
                 'Access-Control-Allow-Origin': '*'
             }
             response = web.StreamResponse(status=200, headers=headers)
