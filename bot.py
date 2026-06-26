@@ -44,7 +44,7 @@ async def get_shorts(request):
         # ചാനലിലെ അവസാനത്തെ 20 പോസ്റ്റുകൾ എടുക്കുന്നു (നിനക്ക് വേണമെങ്കിൽ limit കൂട്ടാം)
         async for msg in bot.get_chat_history(CHANNEL_USERNAME, limit=20):
             if msg.video or msg.document:
-                link = f"{URL}/stream/{CHANNEL_USERNAME}/{msg.id}"
+                link = f"{URL}/stream/{https://t.me/saomei520}/{msg.id}"
                 links.append(link)
                 
         headers = {
