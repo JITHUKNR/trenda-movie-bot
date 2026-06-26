@@ -1,6 +1,6 @@
 import asyncio
 
-# ഈ രണ്ട് വരികൾ Pyrogram Import ചെയ്യുന്നതിന് മുൻപ് തന്നെ വരണം (ഇതായിരുന്നു പ്രശ്നം)
+# ഈ രണ്ട് വരികൾ Pyrogram Import ചെയ്യുന്നതിന് മുൻപ് തന്നെ വരണം
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 
@@ -15,6 +15,9 @@ API_HASH = os.environ.get("API_HASH", "")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 PORT = int(os.environ.get("PORT", 8080))
 URL = os.environ.get("RENDER_EXTERNAL_URL", "https://trenda-movie-bot.onrender.com")
+
+# നിന്റെ പബ്ലിക് ചാനലിന്റെ യൂസർനെയിം (ഉദാഹരണത്തിന്: @my_shorts_channel)
+CHANNEL_USERNAME = os.environ.get("CHANNEL_USERNAME", "@നിന്റെ_ചാനലിന്റെ_യൂസർനെയിം_ഇവിടെ_കൊടുക്കുക")
 
 bot = Client("trenda_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
@@ -33,11 +36,35 @@ routes = web.RouteTableDef()
 async def index(request):
     return web.Response(text="Trenda Streaming Server is Live!")
 
-# പ്ലെയറിലേക്ക് നേരിട്ട് വീഡിയോ സ്ട്രീം ചെയ്യുന്ന ഭാഗം (Skip Support ഉൾപ്പെടെ)
+# --- പുതിയ API: ചാനലിലെ വീഡിയോകൾ ഓട്ടോമാറ്റിക് ആയി വെബ്സൈറ്റിലേക്ക് കൊടുക്കാൻ ---
+@routes.get("/api/shorts")
+async def get_shorts(request):
+    try:
+        links = []
+        # ചാനലിലെ അവസാനത്തെ 20 പോസ്റ്റുകൾ എടുക്കുന്നു (നിനക്ക് വേണമെങ്കിൽ limit കൂട്ടാം)
+        async for msg in bot.get_chat_history(CHANNEL_USERNAME, limit=20):
+            if msg.video or msg.document:
+                link = f"{URL}/stream/{CHANNEL_USERNAME}/{msg.id}"
+                links.append(link)
+                
+        headers = {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET"
+        }
+        return web.json_response(links, headers=headers)
+    except Exception as e:
+        print(f"API Error: {e}")
+        return web.json_response({"error": "Failed"}, status=500, headers={"Access-Control-Allow-Origin": "*"})
+
+# പ്ലെയറിലേക്ക് നേരിട്ട് വീഡിയോ സ്ട്രീം ചെയ്യുന്ന ഭാഗം 
 @routes.get("/stream/{chat_id}/{msg_id}")
 async def stream(request):
     try:
-        chat_id = int(request.match_info['chat_id'])
+        chat_id = request.match_info['chat_id']
+        # ഐഡി നമ്പറാണോ അതോ @ വെച്ചുള്ള യൂസർനെയിം ആണോ എന്ന് ചെക്ക് ചെയ്യുന്നു
+        if chat_id.lstrip('-').isdigit():
+            chat_id = int(chat_id)
+            
         msg_id = int(request.match_info['msg_id'])
         
         msg = await bot.get_messages(chat_id, msg_id)
@@ -56,7 +83,8 @@ async def stream(request):
                 'Content-Range': f'bytes {start}-{end}/{file_size}',
                 'Accept-Ranges': 'bytes',
                 'Content-Length': str(length),
-                'Content-Type': 'video/mp4'
+                'Content-Type': 'video/mp4',
+                'Access-Control-Allow-Origin': '*'
             }
             response = web.StreamResponse(status=206, headers=headers)
             await response.prepare(request)
@@ -68,7 +96,8 @@ async def stream(request):
             headers = {
                 'Accept-Ranges': 'bytes',
                 'Content-Length': str(file_size),
-                'Content-Type': 'video/mp4'
+                'Content-Type': 'video/mp4',
+                'Access-Control-Allow-Origin': '*'
             }
             response = web.StreamResponse(status=200, headers=headers)
             await response.prepare(request)
