@@ -6,6 +6,7 @@ asyncio.set_event_loop(loop)
 
 import os
 import re
+import math
 from pyrogram import Client, filters
 from aiohttp import web
 
@@ -15,10 +16,13 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 PORT = int(os.environ.get("PORT", 8080))
 URL = os.environ.get("RENDER_EXTERNAL_URL", "https://trenda-movie-bot.onrender.com")
 
-# നിന്റെ ചാനലിന്റെ ഐഡി 
+# നിന്റെ ചാനലിന്റെ ഐഡി
 CHANNEL_USERNAME = os.environ.get("CHANNEL_USERNAME", "-1004402285436")
 
 bot = Client("trenda_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+
+# ടെലിഗ്രാമിന്റെ ഡാറ്റാ ചങ്ക് സൈസ് (1 MB)
+CHUNK_SIZE = 1024 * 1024 
 
 @bot.on_message(filters.command("start"))
 async def start(client, message):
@@ -82,8 +86,6 @@ async def stream(request):
             return web.Response(status=403, text="Error: File size exceeds 2GB limit.")
         
         range_header = request.headers.get('Range', '')
-        
-        # ബ്രൗസറിനെ നിർബന്ധിച്ച് MP4 പ്ലേ ചെയ്യിപ്പിക്കാനുള്ള സൂപ്പർ ഫിക്സ് 👇
         forced_filename = "trenda_movie.mp4"
         
         if range_header:
@@ -103,11 +105,29 @@ async def stream(request):
             response = web.StreamResponse(status=206, headers=headers)
             await response.prepare(request)
             
+            # --- SUPER FIX FOR LARGE MOVIES ---
+            # ബൈറ്റ് നമ്പറുകളെ കൃത്യമായ ചങ്ക് നമ്പറുകളാക്കി മാറ്റുന്നു!
+            chunk_offset = start // CHUNK_SIZE
+            skip_bytes = start % CHUNK_SIZE
+            bytes_to_send = length
+            
             try:
-                async for chunk in bot.stream_media(file.file_id, offset=start, limit=length):
+                async for chunk in bot.stream_media(file.file_id, offset=chunk_offset):
                     if not chunk:
                         break
+                    
+                    if skip_bytes > 0:
+                        chunk = chunk[skip_bytes:]
+                        skip_bytes = 0
+                        
+                    if len(chunk) > bytes_to_send:
+                        chunk = chunk[:bytes_to_send]
+                        
                     await response.write(chunk)
+                    bytes_to_send -= len(chunk)
+                    
+                    if bytes_to_send <= 0:
+                        break
             except Exception:
                 pass 
             return response
