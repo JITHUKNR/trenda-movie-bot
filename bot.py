@@ -17,7 +17,7 @@ PORT = int(os.environ.get("PORT", 8080))
 URL = os.environ.get("RENDER_EXTERNAL_URL", "https://trenda-movie-bot.onrender.com")
 
 # നിന്റെ പബ്ലിക് ചാനലിന്റെ യൂസർനെയിം
-CHANNEL_USERNAME = os.environ.get("CHANNEL_USERNAME", "@letsvideoy")
+CHANNEL_USERNAME = os.environ.get("CHANNEL_USERNAME", "@hahaajajuw")
 
 bot = Client("trenda_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
