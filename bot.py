@@ -17,7 +17,7 @@ PORT = int(os.environ.get("PORT", 8080))
 URL = os.environ.get("RENDER_EXTERNAL_URL", "https://trenda-movie-bot.onrender.com")
 
 # നിന്റെ പബ്ലിക് ചാനലിന്റെ യൂസർനെയിം (ഉദാഹരണത്തിന്: @my_shorts_channel)
-CHANNEL_USERNAME = os.environ.get("CHANNEL_USERNAME", "@നിന്റെ_ചാനലിന്റെ_യൂസർനെയിം_ഇവിടെ_കൊടുക്കുക")
+CHANNEL_USERNAME = os.environ.get("CHANNEL_USERNAME", "@saomei520")
 
 bot = Client("trenda_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
@@ -44,7 +44,7 @@ async def get_shorts(request):
         # ചാനലിലെ അവസാനത്തെ 20 പോസ്റ്റുകൾ എടുക്കുന്നു (നിനക്ക് വേണമെങ്കിൽ limit കൂട്ടാം)
         async for msg in bot.get_chat_history(CHANNEL_USERNAME, limit=20):
             if msg.video or msg.document:
-                link = f"{URL}/stream/{https://t.me/saomei520}/{msg.id}"
+                link = f"{URL}/stream/{CHANNEL_USERNAME}/{msg.id}"
                 links.append(link)
                 
         headers = {
